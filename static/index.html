@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>Simple VM Chat</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 1rem; }
+    #chat { border:1px solid #ddd; height: 300px; overflow:auto; padding:8px; background:#fafafa; }
+    .msg { margin:6px 0; padding:6px; border-radius:6px; }
+    .meta { font-size:0.8em; color:#555; }
+    #controls { margin-top:8px; display:flex; gap:8px; }
+    input[type=text] { flex:1; padding:8px; font-size:1em; }
+    button { padding:8px 12px; }
+  </style>
+</head>
+<body>
+  <h2>Simple HTTP Chat (AJAX)</h2>
+  <label>Username: <input type="text" id="username" placeholder="Alice"/></label>
+  <div id="chat"></div>
+
+  <div id="controls">
+    <input id="message" type="text" placeholder="Type a message and press Send"/>
+    <button id="sendBtn">Send</button>
+  </div>
+
+  <script>
+    const chatEl = document.getElementById('chat');
+    const msgInput = document.getElementById('message');
+    const userInput = document.getElementById('username');
+    const sendBtn = document.getElementById('sendBtn');
+    let lastCount = 0;
+
+    function renderMessages(list) {
+      chatEl.innerHTML = '';
+      for (const m of list) {
+        const div = document.createElement('div');
+        div.className = 'msg';
+        div.innerHTML = `<div class="meta"><strong>${escapeHtml(m.user)}</strong> · ${new Date(m.ts).toLocaleString()}</div>
+                         <div>${escapeHtml(m.text)}</div>`;
+        chatEl.appendChild(div);
+      }
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    function fetchMessages() {
+      fetch('/messages').then(r=>r.json()).then(list=>{
+        // naive: re-render always (small app)
+        renderMessages(list);
+      }).catch(err=>{
+        console.error('fetch messages', err);
+      });
+    }
+
+    function sendMessage() {
+      const text = msgInput.value.trim();
+      const user = userInput.value.trim() || 'anon';
+      if (!text) return;
+      fetch('/send', {
+        method:'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ user, text })
+      }).then(r=>{
+        if (!r.ok) console.error('send failed', r.status);
+        return r.json();
+      }).then(_=>{
+        msgInput.value = '';
+        fetchMessages();
+      }).catch(e=>console.error('send error', e));
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    msgInput.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') sendMessage(); });
+
+    // poll every 1s
+    setInterval(fetchMessages, 1000);
+    fetchMessages();
+
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }); }
+  </script>
+</body>
+</html>
